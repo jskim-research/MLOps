@@ -1,0 +1,15 @@
+artifact_uri: ./mlruns/0/248ad94c811847fcbdbe12292454b131/artifacts
+end_time: 1658725445492
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+name: ''
+run_id: 248ad94c811847fcbdbe12292454b131
+run_uuid: 248ad94c811847fcbdbe12292454b131
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1658725443089
+status: 3
+tags: []
+user_id: jisookim
