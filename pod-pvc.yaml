@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mypod
+spec:
+  containers:
+    - name: myfrontend
+      image: nginx
+      volumeMounts:
+        - mountPath: "/var/www/html" # PVC를 mount할 pod 내 경로
+          name: mypd # 아래 volumes[0].name과 일치해야 함
+  volumes:
+    - name: mypd # volumeMounts[0].name과 일치해야 함
+      persistentVolumeClaim:
+        claimName: myclaim # mount할 PVC name => pvc.yaml 실행 후.

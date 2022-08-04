@@ -1,0 +1,10 @@
+apiVersion: v1 # kubernetes resource API version
+kind: Pod # kubernetes resource name
+metadata: # metadata like name, namespace, labels, annotations 포함
+  name: counter  # e.g.,) metdata: {name: counter}
+spec: # main part: specify desired state of resource
+  containers: # 하나 이상의 container로 구성된다.
+    - name: count # container name (list with dictionary element [{name: ..., image: ..., args: ...}]
+      image: busybox # container image
+      args: [/bin/sh, -c, 'i=0; while true; do echo "$i: $(date)"; i=$((i+1)); sleep 1; done']
+

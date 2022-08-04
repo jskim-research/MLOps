@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: myclaim
+spec:
+  accessModes:
+    - ReadWriteMany # ReadWriteOnce, ReadWriteMany
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 10Mi # storage 용량 설정
+  storageClassName: standard # storage class의 name 입력 (kubectl get storageclass 로 확인 가능)
