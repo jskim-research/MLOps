@@ -1,0 +1,172 @@
+"""
+데이터 버전 관리 (데이터에 대한 메타 정보 기록)
+모델 버전 관리 (모델에 대한 메타 정보 기록)
+"""
+
+Data management란?
+시계열 데이터 => window_size = 1, 2, 3, 4, 5, ... => 어떤 데이터가 어떤 feature engineering을 거쳤던건지??
+
+Github is not for Large data (text, source code 등이 대상임)
+
+Git + 데이터 관리 툴 [DVC, Pachyderm, Delta Lake, Dolt]
+
+이번 실습엔 open source인 data version control(DVC) 사용
+
+DVC
+- 대부분의 스토리지와 호환 (amazon s3, google drive, ...)
+- Github 외의 GitLab, Bitbucket 등 대부분 git 호스팅 서버와 연동
+- Data pipeline을 DAG로 관리 (전처리, 재현 가능한 형태로 관리)
+- Git과 유사한 인터페이스
+
+실제 데이터는 remote data storage (S3, GS, Azure, SSH, etc)에 저장하고 git에선 meta data를 보도록 함
+
+DVC 실습
+# dvc[all]의 [all]은 dvc의 remote storage로 s3, gs, azure, oss, ssh 모두 사용할 수 있도록 관련 패키지 함께 설치하는 옵션
+pip install dvc[all]==2.6.4
+mkdir dvc-tutorial
+cd dvc-tutorial
+git init
+dvc init
+mkdir data
+cd data
+vi demo.txt
+cd ..
+dvc add data/demo.txt
+git add data/demo.txt.dvc data/.gitignore # track the changes with git
+cd data
+cat demo.txt.dvc # dvc add에 의해 생겨난 파일 조회 (demo.txt 관리를 위한 메타 데이터)
+git commit -m "Add demo.txt.dvc"
+
+# data 실제로 저장될 remote storage 세팅
+# google drive 새로운 폴더 생성 후 url로부터 id 복사
+id = 1p569WpYlp9_GK6XN2AUyVVGZD4pgAzhT
+
+dvc remote add -d storage gdrive://1p569WpYlp9_GK6XN2AUyVVGZD4pgAzhT
+git add ../.dvc/config  # dvc의 변경을 git이 따라갈수 있도록 추가 작업이 항상 필요하다
+git commit -m "add remote storage"
+dvc push  # 데이터를 remote storage에 업로드
+
+# dvc pull 실습
+rm -rf .dvc/cache/
+rm -rf data/demo.txt
+dvc pull
+
+# data version 변경 실습
+vi demo.txt  # 데이터 변경
+cat demo.txt
+dvc add demo.txt
+git add demo.txt.dvc  # git에는 실제 데이터가 아닌 meta data만 저장
+git commit -m "update demo.txt"
+dvc push  # 새로운 버전의 data file을 remote storage에 업로드
+git push  # .dvc 파일을 git repository에 업로드
+
+git log --oneline
+git checkout <COMMIT_HASH> demo.txt.dvc  # demo.txt.dvc 파일을 이전 commit 버전으로 되돌림
+dvc checkout  # demo.txt.dvc 의 내용을 보고 demo.txt 파일을 이전 버전으로 변경
+cat demo.txt
+
+DVC 추가 기능
+- python API를 사용한 제어
+    - https://dvc.org/doc/api-reference
+- S3, HDFS, SSH 등의 remote storage 연동
+- DAG를 통한 Data pipeline 관리
+    - https://dvc.org/doc/start/data-pipelines
+- dvc metrics, dvc plots를 통한 각 실험의 metrics 기록 및 시각화
+
+Model management란?
+ML model cycle: Raw data => Data processing => Train & evaluate (model creation or modification) => Raw data ...
+best model 선택을 위해 필요한 정보들? (추후 성능 비교, 재현 문제 고려)
+- model 소스 코드
+- evaluation metric 결과
+- 사용한 parameters
+- model.pkl 파일
+- 학습에 사용한 data
+- 데이터 전처리용 코드
+- 전처리된 data
+...
+
+ML model cycle 관리의 어려움
+- 비슷한 작업 반복적 발생
+- Dependency package들이 많으며, 버전 관리 어려움
+- 사람 dependency 발생
+- 테스트 어려움
+- 재현되지 않는 경우 많음
+- model 학습용 코드 구현하는 사람과 serving 용 코드 구현하는 사람이 분리되어 있음
+- ...
+
+다양한 model management tools (code에 몇 줄 추가해서 model meta 정보까지 저장)
+- MLflow
+- Tensorboard
+- Neptune
+- Weights & Biases
+- Comet.ml
+
+MLflow 구성 요소
+- mlflow tracking (현재 강의 목표)
+    - model hyperparameter, metric 등의 meta 정보 변경 기록 저장소 제공 (python 함수로 가능)
+- mlflow projects
+- mlflow models
+- mlflow model registry
+    - model 학습 코드가 성능을 재현할 수 있도록 pytorch/tensorflow version, docker version 등 model 의존성 있는 정보들 기록
+    - serving 까지 이어짐 (실무에서 굉장히 유용하다고 함)
+
+DB (S3, ...) - MLflow server - UI / API
+
+MLflow 실습
+
+mkdir mlflow-tutorial
+cd mlflow-tutorial
+pip install mlflow==1.20.2
+mlflow --version  # 오류 발생시 protobuf <= 1.20.x 로 downgrade
+
+# mlflow tracking server 띄움
+# default url = http://localhost:5000
+# production 용으로는 mlflow ui 대신 mlflow server를 사용하라
+# default로 ./mlruns 폴더에 데이터들 저장 (option 확인)
+mlflow ui --help
+
+# mlflow server는 worker를 여러 개 띄울 수 있다
+# prometheus가 metrics 을 가져갈 수 있도록 엔드포인트를 제공하는 등의 추가적인 기능 존재
+# local만 사용하는 mlflow ui와 달리 S3와 같은 외부 저장소를 사용할 수 있음
+mlflow server --help
+
+mlflow ui  # 한 사람이 사용하는 경우 가볍게 테스트 => localhost 접속 가능 및 mlruns 폴더 생성됨
+cat mlruns/0/meta.yaml
+
+# example code
+# train_diabetes.py: scikit-learn package에서 제공하는 당뇨병 진행도 예측용 데이터로
+# ElasticNet 모델을 학습하여 predict 한 뒤 evaluation metric을 MLflow에 기록하는 예제
+wget https://raw.githubusercontent.com/mlflow/mlflow/master/examples/sklearn_elasticnet_diabetes/osx/train_diabetes.py
+python train_diabetes.py 0.1 0.1
+...
+* mlflow.log_metrics()
+* mlflow.log_param()
+* mlflow.sklearn.log_model()
+...
+
+# localhost:5000 확인
+# 실제 파일 위치는 default로 mlruns/Experiment-id/run-id/ 폴더 아래에 있음
+
+# MLflow를 사용한 serving example
+# 127.0.0.1:<port> 에서 REST API 사용 가능
+mlflow models serve -m $(pwd)/mlruns/0/<run-id>/artifacts/model -p <port>
+
+mlflow models serve -m $(pwd)/mlruns/0/86711e5543464ba290d93c3dfd150f5b/artifacts/model -p 1235 # 서빙 실행
+mlflow models serve -m $(pwd)/mlruns/0/86711e5543464ba290d93c3dfd150f5b/artifacts/model -p 1235 --no-conda # conda 환경에서 이미 실행중이면 이 옵션 붙일것
+
+# RESP API to model
+# query가 잘못된 경우 관련해서도 잘 알려줌
+# 그러나 serving은 강의에서 다른 tool들을 쓸 것이므로 이 정도까지만.
+curl http://127.0.0.1:5000/invocations -H 'Content-Type: application/json' -d '{"columns": ["a", "b", "c"], "data": [[1, 2, 3], [4, 5, 6]]}'
+curl -X POST -H "Content-Type:application/json" --data '{"columns":["age", "sex", "bmi", "bp", "s1", "s2", "s3", "s4", "s5", "s6"], "data":[[0.038076, 0.050680, 0.061696, 0.021872, -0.044223, -0.034821, -0.043401, -0.002592, 0.019988, -0.017646]]}' http://127.0.0.1:1235/invocations
+
+# mlflow와 친숙해지기 위한 실습
+# training data => sklearn pipeline => StandardScaler 전처리 + LinearRegression
+# scikit-learn과 같은 패키지는 mlflow level에서 autolog 지원
+# model의 parameters, metrics 와 model artifacts를 사용자가 명시하지 않아도 자동으로 mlflow에 로깅
+wget https://raw.githubusercontent.com/mlflow/mlflow/master/examples/sklearn_autolog/utils.py
+wget https://raw.githubusercontent.com/mlflow/mlflow/master/examples/sklearn_autolog/pipeline.py
+python pipeline.py  # mlflow.sklearn.autolog() 지원 => tensorflow, pytorch 도 똑같음
+
+# xgboost==1.4.2 설치 필요
+wget https://raw.githubusercontent.com/mlflow/mlflow/master/examples/xgboost/train.py

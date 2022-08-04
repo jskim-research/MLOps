@@ -1,0 +1,56 @@
+
+Dockerfile: 사용자가 도커 이미지를 쉽게 만들 수 있도록 제공하는 템플릿
+- FROM image: base image로 사용할 것 지정
+- COPY src dest: src => dest 복사
+- RUN command: 명시한 커맨드 도커 컨테이너에서 실행
+- CMD command: 명시한 커맨드를 도커 컨테이너가 시작될 때 실행하는 것을 명시 (하나의 docker image => 하나의 CMD만 가능함. RUN과 다름)
+- WORKDIR path: 이후 작성될 명령어를 컨테이너 내의 어떤 디렉토리에서 수행할 것인지? 해당 디렉토리가 없으면 생성함
+- ENV <key> <value>: 컨테이너 내부에서 지속적으로 사용될 environment variable 값을 설정하는 명령어
+  (e.g.,
+  RUN local-gen ko_KR.UTF-8
+  ENV LANG ko_KR.UTF-8
+  ENV LANGUAGE ko_KR.UTF-8
+  ENV LC_ALL ko_KR.UTF-8)
+- EXPOSE <port>/<protocol>: 컨테이너에서 허용할 포트/프로토콜 지정. protocol 미지정 시 TCP 디폴트 지정
+
+
+실습용 쿠버네티스 (간단하게 노트북에 설치 및 제거 할 수 있음)
+- minikube => 실습 사용
+- MicroK8s
+- K3s
+
+쿠버네티스 컨셉
+- 선언형 인터페이스 & Desired State
+명령형 인터페이스: 에어컨의 냉매는 어떤걸 쓰고 얼마나 압축한 다음 어떻게 순환시켜서 ...
+선언형 인터페이스: 내 방 온도가 20도가 되었으면 좋겠어 (desired state = 20도)
+- master node & worker node
+master node가 worker node들 관리
+
+Pod란?
+- pod는 쿠버네티스에서 생성하고 관리할 수 있는 배포 가능한 가장 작은 컴퓨팅 단위
+- pod 단위로 스케줄링, 로드밸런싱, 스케일링 등의 관리 작업 수행 (어떤 애플리케이션을 배포하고 싶으면 최소 pod로 구성해야함)
+- 하나의 pod는 1개 이상의 Container로 이루어진다 (pod 내부 container는 자원을 공유함)
+- pod는 stateless 한 특징을 지니며 언제든지 삭제될 수 있는 자원이다
+
+Deployment란?
+- pod와 replicaset에 대한 관리(self-healing, scaling, rollout, ...)를 제공하는 단위
+- pod를 deployment로 배포함으로써 여러 개로 복제된 pod, 여러 버전의 pod를 안전하게 관리할 수 있다
+
+Service란?
+- 쿠버네티스에서 배포한 애플리케이션(pod)을 외부에서 접근하기 쉽게 추상화한 리소스
+- pod는 생성, 삭제 후 재생성마다 IP를 재할당 받으므로 고정된 IP 로 원하는 pod에 접근할 수 없다
+- 따라서 외부 혹은 내부에서 pod에 접근할 때 pod의 IP가 아닌 Service를 통해서 접근한다
+- Service는 고정된 IP를 가지며 service는 하나 혹은 여러 개의 pod와 매칭
+- Type
+    - NodePort: kubernetes cluster 내부에 배포된 서비스를 클러스터 외부에서 접근 가능
+    - LoadBalancer: 마찬가지로 클러스터 외부에서 접근 가능하나 LoadBalancing 역할을 하는 모듈 추가 필요
+    - ClusterIP: 고정된 IP, PORT를 제공하나 클러스터 내부에서만 접근 가능한 대역의 주소 할당
+    - 실무: MetalLB와 같은 LoadBalancing 모듈 설치 후 LoadBalancer type으로 서비스 expose
+        - NodePort는 Pod가 할당된 후에 해당 노드의 IP를 알아야한다는 단점 존재
+
+Persistent volume claim (PVC)란?
+- persistent volume (PV), PVC는 stateless 한 pod 가 영구적으로 데이터를 보존하고 싶은 경우 사용하는 리소스
+- docker run의 -v 옵션인 docker volume과 유사
+- PV는 관리자가 생성한 실제 저장 공간의 정보를 담고 있고, PVC는 사용자가 요청한 저장 공간의 스펙에 대한 정보를 담고 있는 리소스
+    - pod 내부에서 작성한 데이터는 언제든지 사라질 수 있기에 보존하고 싶은 데이터는 PVC를 mount 해서 사용해야 한다.
+- PVC를 사용하면 여러 pod 간의 data 공유도 쉽게 가능

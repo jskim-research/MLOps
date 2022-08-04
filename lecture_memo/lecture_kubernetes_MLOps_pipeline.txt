@@ -1,0 +1,55 @@
+MLOps를 위한 핵심적인 쿠버네티스 특징
+- Reproducibility -> 실행 환경의 일관성 & 독립성 (pod)
+- Job scheduling -> 스케줄 관리, 병렬 작업 관리, 유휴 자원 관리 (deployment)
+- Auto-healing & auto-scaling -> 장애 대응, 트래픽 대응 (deployment, service)
+=> 학습 서버의 장애 자동 대응, gpu 추가 시 대응, ...
+=> 다수의 사람이 같이 쓸 때 queue에 task만 던져놓으면 알아서 처리
+
+kubernetes에 익숙치 않은 사람도 ML model 개발 전과정을 해볼 수 있게 구글이 프로그램 제공
+- kubeflow
+
+kubeflow 메인 구성요소
+- pipelines => katib (하이퍼 파라미터 튜닝)
+
+kubeflow pipelines
+- 머신러닝 workflow 를 DAG 형태로 정의한 것
+- pipeline을 구성하는 각각의 component 들이 k8s 위에서 pod로 생성되어 서로 데이터를 주고받으며 흘러감
+- 목적
+    - end to end orchestration
+        - 모델 연구 및 학습 과정과 서빙 과정의 괴리가 없도록
+    - easy experimentation
+        - 다양한 configuration 에 따라 수많은 시도를 쉽게
+    - easy re-use
+        - 잘 설계된 kfp component 들은 재사용 가능하므로 새로 pipeline 만들 때 작업 효율 향상
+
+kubeflow 설치
+- pre-requisite
+    - kustomize
+        - 여러 개의 yaml 파일들을 쉽게 관리하기 위한 도구 (Helm 과 비슷한 역할)
+    - 여러 resource 들의 configuration을 템플릿(base)과 커스터마이징한 부분(overlay)로 나누어서 관리할 수 있는 도구
+    - kustomize build 를 통해 base + overlay 가 merge 된 형태의 yaml 파일들을 생성 가능
+- kubeflow manifests 이용
+- step 1: kustomize 설정
+    - https://github.com/kubernetes-sigs/kustomize/releases/tag/v3.2.0
+    - chmod +x kustomize_3.2.0_darwin_amd64
+    - mv kustomize_3.2.0_darwin_amd64 /usr/local/bin/kustomize
+    - kustomize version (실행될 것)
+- step 2: minikube start
+    - minikube start --driver=docker \
+    --cpus='2' --memory='2g' \
+    --kubernetes-version=v1.19.3 \
+    --extra-config=apiserver.service-account-signing-key-file=/var/lib/minikube/certs/sa.key \
+    --extra-config=apiserver.service-account-issuer=kubernetes.default.svc
+- step 3: git clone kubeflow/manifests
+    - git clone https://github.com/kubeflow/manifests.git
+    - cd manifests
+    - git checkout tags/v1.4.0
+- step 4: 각각의 kubeflow 구성 요소 순서대로 설치
+    - kubeflow/manifests tags/v1.4.0 installation 가이드 확인
+    - 설치 상태 확인을 위해 istio 같은 경우 kubens istio-system 이후 kubectl get po
+    - knative, kfserving Training/MPI operator 생략
+    - pipelines 설치 시 STDIN error 뜰 경우 명령어 재실행
+    - 현재 error가 뜨는데 아마도 minikube start 시의 memory 문제일 것 같음
+    - Part4 chap1-2 23분부터 다시 볼 것
+
+

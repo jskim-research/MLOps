@@ -1,0 +1,125 @@
+Ex.) 비트코인 자동 매매 AI를 만들고 24시간 돌린다
+- inference server가 다운되면?
+- 거래소 서버가 터지면?
+- 갑자기 전쟁이 나면?, 갑자기 미 연준이 테이퍼링 발표를 한다면?, 갑자기 일론 머스크가 트위터를 한다면?
+- ...
+
+AI 성능은 데이터의 분포등에 따라 시시각각 성능이 바뀔 수 있다.
+해결하기 위해 모니터링으로 장애를 발견하고 대응해야한다. => 고도화된 AI system
+
+무엇을 monitoring 해야하는가? (ML test score, google)
+ML 관련 (model 성능)
+- input data distribution (outlier가 너무 많이 들어오고 있지 않은지? skewed 돼있는지?)
+- feature distribution
+- output data distribution (auto-encoder output distribution 등)
+- performance (evaluation)
+- model stability
+- ...
+Ops 관련 (서비스 성능)
+- request latency
+- request error rate
+- CPU, memory utilization
+- disk I/O
+- network traffic
+- ...
+
+ML 서비스 모니터링이 어려운 이유
+쇼핑몰 페이지 접속이 원활하지 않은 상황 (기존 시스템은 정량적 metric 명확)
+- request latency, throughput
+- request error rate
+- cpu, memory utilization
+- disk I/O
+- network traffic
+
+쇼핑몰 고객 맞춤 추천 제품의 판매량 하락 (정량적 metric 명확하지 않음)
+- ?
+- 원인 파악 (domain, business...), 데이터 재수집, 전처리, 재학습 => 시간 오래 걸림
+
+모니터링을 위한 오픈소스
+- Prometheus
+- Grafana
+- Grafana loki (Grafana와 쉽게 연동할 수 있는 logging tool)
+- Thanos (모니터링을 모니터링하기 위한 tool)
+
+Prometheus 란?
+- 수집하는 metric data => 다차원 시계열 데이터 형태로 저장
+- 데이터 분석을 위한 자체 언어 PromQL 지원 (like SQL)
+- 시계열 데이터 저장에 적합한 TimeSeries DB 지원
+- 데이터 수집 방식 = Pull
+    - 모니터링 대상의 Agent가 Server로 metric을 보내는 push 방식이 아닌 server가 직접 정보를 가져가는 pull 방식
+    - push 방식을 위한 push gateway도 지원
+- 다양한 시각화 툴 연동 / Alarming (email, ...) 지원
+- components
+    - prometheus server
+        - 시계열 데이터 수집 및 저장
+            - metric 수집 주기를 설치 시 정할 수 있으며 default 는 15초
+    - service discovery
+        - monitoring 대상 리스트 조회
+        - 사용자가 쿠버네티스에 등록하고, prometheus 서버가 쿠버네티스 API server에게 모니터링 대상 물어봄 (pull metric)
+    - exporter
+        - HTTP endpoint 를 제공하여 prometheus server가 HTTP GET request로 metrics pull 가능
+        - 이러한 Pull 방식은 수집 주기, 네트워크 단절 등의 이유로 모든 metrics 수집 보장 X => Push gateway 제공
+    - AlertManager
+        - PromQL을 사용해 특정 조건문을 만들고, 해당 조건문이 만족되면 정해진 방식으로 정해진 메세지 보낼 수 있음
+    - Grafana
+        - prometheus 와 항상 함께 연동되는 시각화 툴
+        - prometheus 자체 UI도 있고, API 제공을 하기에 직접 시각화 대시보드를 구성할 수도 있음
+        - PromQL로 시각화할 데이터 가져옴
+    - PromQL
+        - prometheus 가 저장한 데이터 중 원하는 정보만 가져오기 위한 query language 제공
+
+    단점
+    - prometheus server 가 single node 로 운영되므로 scalability, high availability 존재
+      => thanos 오픈소스를 활용해 multi prometheus server 운영
+
+Grafana 란?
+- 다양한 데이터 소스 제공
+    - oracle DB, jira, mongo DB, google sheets, ...
+- 다양한 Grafana dashboard
+    - 공유되는 것들 있음
+- Google에서 제시한 전통 SW 모니터링을 위한 4 가지 황금 지표 (ML 기반 서비스도 이를 염두에 두고 대시보드 구성)
+    - latency: 사용자가 요청 후 응답을 받기까지 걸리는 시간
+    - traffic: 시스템이 처리해야 하는 총 부하
+    - errors: 사용자 요청 중 실패한 비율
+    - saturation: 시스템 포화 상태
+
+실습
+
+minikube start --driver=docker --cpus='2' --memory='2g'
+
+# kube-prometheus-stack helm repo 추가
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+
+# kube-prometheus-stack 설치
+# https://github.com/prometheus-community/helm-charts/blob/main/charts/kube-prometheus-stack/values.yaml
+# default value 사용
+# 실무에선 values.yaml 수정하여 git으로 환경별 히스토리 관리함
+helm install prom-stack prometheus-community/kube-prometheus-stack
+
+kubectl get pod -w  # deploy 확인
+
+포트포워딩
+kubectl port-forward svc/prom-stack-grafana 9000:80  # Grafana
+kubectl port-forward svc/prom-stack-kube-prometheus-prometheus 9091:9090  # Prometheus
+kubectl get svc  # 접속 서비스 제공
+
+# Prometheus UI login
+connect to localhost:9091
+PromQL
+- kube_pod_container_status_running
+    - running status 인 pod 출력
+- container_memory_usage_bytes
+    - container 별 memory 사용 현황 출력
+- 다양한 AlertRule 이 default로 생성되어 있음
+    - expression 이 PromQL 기반으로 정의됨
+    - 해당 AlertRule 이 발생하면 어디로 어떤 message 를 보낼 것인지도 정의 가능 (default None)
+
+# Grafana UI login
+connect to localhost:9000 (default connection info = admin / prom-operator => values.yaml에 있음)
+
+# id / pw 확인
+kubectl get secret --namespace default prom-stack-grafana -o jsonpath="{.data.admin-user}" | base64 --decode ; echo
+kubectl get secret --namespace default prom-stack-grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
+
+

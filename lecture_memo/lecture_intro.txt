@@ -1,0 +1,27 @@
+# MLOps
+구성
+데이터
+- 데이터 수집 파이프라인 (apache 등...) (빅데이터 처리?)
+- 데이터 저장 (MySQL 등 ...) (진짜 저장)
+- 데이터 관리 (TFDV 등 ...) (어떤 전처리를 했던건지, 어떤 데이터셋에 대해서..)
+
+모델
+- 모델 개발 (Docker,Kuberflow/Optuna...) (격리된 환경에서 작업 / 하이퍼파라미터 튜닝...)
+- 모델 버전 관리 (Git, MLflow, Github Action, Jenkins...) (진짜 버전 관리부터 CI/CD 등)
+- 모델 학습 스케줄링 관리 (Grafana, Kubernetes) (같은 서버? 등을 사용할 때 학습 일정 배분하는건가싶음)
+
+서빙 (API를 server에 넘겨서 command 수행)
+- 모델 패키징 (Docker, Flask, ...) (API serving framework 이용가능)
+- 서빙 모니터링 (Prometheus, Grafana, ...) (serving 후에 모델의 성능 metric 지속적인 감시, 알람을 받을 수 있음)
+- 파이프라인 매니징 (Kubeflow, argo workflows, Airflow) (성능 저하 요소 확인을 위해 이전 모델 학습 파이프라인을 한번에 실행해볼 수 있음 => 재현)
+
+위와 같은 solution들을 한번에 제공해주는 것이 Amazon SageMaker, vertex.ai (google), Azure ML 등임
+
+MLOps와 Docker/Kubernetes
+간단한 설명: 다수의 사람이 하나의 서버를 공유하는 환경에서 Docker (독립적인 app + 환경)를 서버에 올릴 때
+적당한 rule에 따라 적재적소의 공간에 배치하며 실행이 끝났을 때는 깔끔하게 정리해주는 것을 Kubernetes가 담당한다.
+
+
+
+
+

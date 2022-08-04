@@ -1,0 +1,98 @@
+Serving 이란?
+사용자는 input만 전송하고 서버에서 선택된 모델로 처리 후 output 전달
+
+서빙 단계에서 막히는 이유
+- 모델 개발과정과 소프트웨어 개발 과정의 파편화
+=> 모델 개발자는 연구에 치중, 소프트웨어 개발자는 연구 목적의 모델을 서빙용으로 잘 변경해야함 (대용량 처리등에 대응하여)
+- 모델 평가 방식 및 모니터링 구축 어려움 => 모델이 서비스 단계에서 정상적으로 돌아가고 있는지?
+
+서빙의 간편화를 도와주는 도구
+- Seldon Core
+- TFServing
+- KFServing
+- Torch Serve
+- BentoML
+
+초반엔 간단하게 Flask로 web API를 구축하고 kubernetes에서 seldon core 이용
+
+Flask란? (모델 서빙 방식 1)
+- web app framework
+- Django 등 다른 framework 에 비해 굉장히 가벼우며 확장성, 유연성이 뛰어난 프레임워크
+- 사용하기 쉽고, 간단한 기능을 가볍게 구현하기에 적합하기 때문에 첫 배포 step으로 Flask를 자주 사용
+
+Flask 설치
+
+mkdir flask-tutorial
+cd flask-tutorial
+
+pip install -U Flask
+Flask --version
+
+# /fask-tutorial/app.py 참고
+# 서빙용 웹 API는 만들었는데, docker로 만들고 장애회복, 로드밸런싱 등을 위한 kubernetes로 가기 위한 추가적인 tool 필요 (번거로운 작업들 처리)
+
+Seldon core란? (모델 서빙 방식 2)
+pre-requisite
+- custom resource (CR)
+    - 자세한 건 official docs 확인
+    - 쿠버네티스 기본 관리 리소스: pod, deployment, service, persistent volume
+    - 유저 정의 리소스 (with kubernetes API): CR의 LifeCycle, 동작 관리 Controller (or API server) 구현 후 쿠버네티스 클러스터에 배포해야 함
+        - CR 등록 방식: Custom Resource Definition (CRD), API Aggregation (AA) / 이번 강의에선 CRD만.
+        - CRD: CR을 관리할 Custom Controller를 구현하고 배포하여 사용, Controller는 대부분 Operator 패턴으로 개발
+               즉, 쿠버네티스에서 default로 관리하는 것은 아니나 배포된 Custom Controller에 의해 관리되고 있는 리소스들임
+
+- operator pattern
+    - 자세한 건 official docs 확인
+    - Controller: current state를 desired state에 일치시키도록 지속적으로 동작하는 무한 루프
+    - Operator
+        - 주로 CR의 current state/desired state 를 지속적으로 관찰, 일치시키도록 하는 역할
+        - seldon-core, prometheus, grafana, kuberflow, katib 등이 operator pattern으로 개발됨
+
+- Helm
+    - 자세한 건 official docs 확인
+    - 쿠버네티스 모듈의 package managing tool
+        - apt, brew, pip 와 비슷한 역할
+    - 하나의 쿠버네티스 모듈은 다수의 리소스들을 포함하고 있는 경우가 많다
+        - a.yaml, b.yaml, ... 등 많은 쿠버네티스 리소스 파일들을 관리해야 하기에 버전 관리, 환경별 리소스 파일 관리 등 어려움
+    - Helm은 이러한 작업을 템플릿화 시켜 많은 수의 리소스들을 마치 하나의 리소스 처럼 관리할 수 있게 도와주는 도구
+        - Helm manifest = templates & values.yaml 로 이루어짐
+                          templates 폴더에는 해당 모듈에서 관리하는 모든 쿠버네티스 리소스들의 템플릿 파일이 보관됨
+        - values.yaml interface를 통해 사용자에게 값을 입력받아 templates 정보와 merge 하여 배포
+
+Seldon Core 설치
+- prerequisites
+    - 쿠버네티스 환경 (v1.18 이상)
+        - minikube
+        - kubectl
+    - Helm 3
+    - Ingress Controller
+        - Ambassador
+
+# kubernetes 동작
+minikube start --driver=docker --cpus='4' --memory='4g'  # 컴퓨터 상황상 cpu 2개, memory 2g 가능
+minikube start --driver=docker --cpus='2' --memory='2g'
+
+# helm version 3.5.4 설치를 위해 URI는 https://github.com/helm/helm/releases link 확인 (또는 이 링크에서 설치파일 다운로드)
+wget https://get.helm.sh/helm-v3.5.4-darwin-amd64.tar.gz
+tar -zxvf helm-v3.5.4-darwin-amd64.tar.gz
+mv darwin-amd64/helm /usr/local/bin/helm
+
+# ambassador pattern => 프록시 역할을 하는 ambassador를 중간에 둬서 작업들을 받으면 알아서 분배 및 처리하도록 함 (트래픽 조절 등?)
+# ambassador 설치 (helm 이용) - 안됨 (deprecated 라고 함)
+# seldon-core 설치 - 됨
+
+# https://docs.seldon.io/projects/seldon-core/en/latest/workflow/install.html 참고하여 seldon core 설치 진행
+kubectl create namespace seldon-system
+# install seldon-core in the seldon-system
+helm install seldon-core seldon-core-operator \
+    --repo https://storage.googleapis.com/seldon-charts \
+    --set usageMetrics.enabled=true \
+    --set ambassador.enabled=true \
+    --namespace seldon-system
+
+Flask vs Seldon-Core
+- Seldon-Core에서 정의한 CR 중 하나인 SeldonDeployment는 학습 완료된 model을 load해서 serving하는 것 담당
+- Flask와 달리 API, IP, PORT, docker build, push, pod yaml 작성 후 배포와 같은 작업 없이 trained model 파일 경로만 전달하면 자동 처리
+- ? 근데 파이썬 코드에서 경로만 적는건 아니고 IP나 여러가지 쓰긴 쓰네
+
+
