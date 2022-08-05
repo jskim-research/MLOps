@@ -1,6 +1,10 @@
 # install docker
 # refer https://docs.docker.com/engine/install/ubuntu/
 
+# give permission to run docker without root
+sudo usermod -aG docker $USER
+newgrp docker
+
 # install minikube
 curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
 sudo install minikube-linux-amd64 /usr/local/bin/minikube
