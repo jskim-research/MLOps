@@ -4,7 +4,10 @@
 
 ```
 OS: 
-	ubuntu 20.04
+	virtualbox 6.1 / ubuntu 20.04
+	disk memory should be at least 40GB
+	RAM should be at least 8GB
+	Number of cpu should be at least 2 (4 used in the project)
 
 Docker:
 
@@ -51,9 +54,6 @@ minikube start options: (main reason of version compatibility issues)
 	--kubernetes-version=v1.21.3
 
 ```
-
-## Version
-
 
 
 ## Chapter ...
