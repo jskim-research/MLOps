@@ -9,10 +9,17 @@ newgrp docker
 curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
 sudo install minikube-linux-amd64 /usr/local/bin/minikube
 
+# install kubectl
+curl -LO https://dl.k8s.io/release/v1.22.1/bin/linux/amd64/kubectl
+sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+
 # start minikube
+# kubernetes apiVersion should be v1 due to CustomResourceDefinition (kubernetes-version <= 1.21.x)
+# To be compatible with other docker, kubectl version, 1.21.x is selected
 minikube start --driver=docker \
 --cpus='4' --memory='7g' \
---kubernetes-version=v1.19.3 \
+--kubernetes-version=v1.21.3 \
 --extra-config=apiserver.service-account-signing-key-file=/var/lib/minikube/certs/sa.key \
 --extra-config=apiserver.service-account-issuer=kubernetes.default.svc
+
 
