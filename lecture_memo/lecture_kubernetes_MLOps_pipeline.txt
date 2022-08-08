@@ -52,4 +52,71 @@ kubeflow 설치
     - 현재 error가 뜨는데 아마도 minikube start 시의 memory 문제일 것 같음
     - Part4 chap1-2 23분부터 다시 볼 것
 
+kubeflow 접속
+- 포트 포워딩
+    - kubectl port-forward svc/istio-ingressgateway -n istio-system 8080:80
+    - localhost:8080 으로 kubeflow 대시보드 접속 가능
+    - default 접속 정보 = ID: user@example.com, PW: 12341234
+
+Other useful tool
+- kubectx
+    - kubectx: kubernetes current-context 변경 툴
+    - kubens: kubernetes current-namespace 변경 툴
+    - https://github.com/ahmetb/kubectx 에서 설치
+        - kubens kubeflow => 바라보고 있는 namespace를 kubeflow로 변경
+- kubectl-alias
+    - https://github.com/ahmetb/kubectl-aliases 에서 설치
+    - e.g.,) kubectl get pod -> kgpo
+    - e.g.,) kubectl get deployment -w -> kgdepw
+
+kubeflow 기능 살펴보기
+- Notebook
+    - working space => kubeflow는 pod 기반이고, pod가 stateless하기 때문에 저장하고 싶으면 따로 공간 지정 필요
+- Tensorboards
+    - 클라우드 등의 store에서 가져올 수 있음
+- Volumes
+    - Persistent volume claim (PVC)
+- Models
+    - skip
+- Experiments (AutoML => katib tuning 용)
+- Experiments (kubeflow pipeline, KFP => pipeline 결과 확인용)
+- Pipelines
+    - preprocessing => training 등의 pipeline 정의
+    - compile한 yaml 파일을 업로드 하여 정의 가능
+- Runs
+    - pipeline 실행 시킬 수 있음 (create run) // pipelines 에서도 실행은 가능
+- Recurring Runs
+    - 어떤 주기 별로 pipeline을 실행시킬 것인지 recurring mode 결과
+- Artifacts
+    - 훈련된 모델 등 저장
+- Manage contributors
+    - user id를 추가하면 추가된 user는 자신과 같은 kubeflow 인터페이스에 접근 가능
+
+KFP 실습 1
+python3 -m pip install kfp --upgrade
+# Running check => python code 내에서 import kfp 해서 쓰는 쪽으로 전환
+# kubectl get nodes
+# kubectl get pod -n kubeflow
+
+Component: (대체로) 재사용 가능한 형태로 분리된 하나의 작업 단위 = Pod
+Pipeline: 여러 Component들의 연관성, 순서에 따라 연결지은 그래프 (DAG) = Workflow
+
+kfp sdk => pipeline 구현 => kfp dsl-compile or kfp.compiler.Compiler().compile() 로 k8s가 이해할 수 있는 형태의 yaml 파일 생성
+Workflow: 여러 개의 container 들을 정해진 순서에 따라 실행시키고, input/output 을 전달하는 것을 정의한 DAG.
+          k8s 기본 리소스는 아니지만 argoproj의 workflow-controller에 의해 관리되는 custom resource 임.
+
+component들은 하나의 baseline image 위에서 독립적 (메모리, ...)으로 실행되며 일반적으로 input/output으로 communication.
+(PVC로 공유할 수도 있긴 함)
+
+kfp library를 활용하여 pipeline code를 만들고 compile => 이 때 코드에 한글 주석 등이 있으면 나중에 오류가 나니 제거
+pandas와 같이 import 하여 쓰는 경우 component에 해당하는 함수 안에서 선언하고 사용해야하며, clean 하게 하기 위해선 base image 사용
+(e.g., create_component_from_func(func=..., base_image='python:customized', ...)
+
+오류 등의 발생으로 container 생성이 멈춰있다면 kubectl describe pods  사용 (해당 namespace로 가서 써야함)
+=> 뭔가 not found가 생길 경우 namespace 내에 같이 있는지 확인.
+(kubectl get secret <secret-name> --namespace=<source-namespace>  -o yaml \
+  | sed 's/namespace: <from-namespace>/namespace: <to-namespace>/' \
+  | kubectl create -f -)
+(이번 경우는 mlpipeline-minio-artifact가 container creating하는 pod와 같은 namespace에 없었던 것이 문제였음)
+(참고: https://stackoverflow.com/questions/55515594/is-there-a-way-to-share-a-configmap-in-kubernetes-between-namespaces/55516643)
 
